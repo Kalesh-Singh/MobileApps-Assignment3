@@ -11,6 +11,9 @@ import android.graphics.Rect;
 import java.util.ArrayList;
 import java.util.List;
 
+import static com.techexchange.mobileapps.assignment3.MainActivity.GREEN_SCORED;
+import static com.techexchange.mobileapps.assignment3.MainActivity.RED_SCORED;
+
 public class Shell {
 
     enum State {
@@ -23,6 +26,7 @@ public class Shell {
     private static final int START_INDEX = 2;
 
     private final Context context;
+    private final MainActivity activity;
     private final List<Bitmap> bitmaps;
     private final int screenWidth;
     private final int screenHeight;
@@ -42,6 +46,7 @@ public class Shell {
 
     Shell(Context context, int screenWidth, int screenHeight, int tankWidth, int tankHeight, int tankXSpeed, int tankYSpeed) {
         this.context = context;
+        this.activity = (MainActivity) context;
         this.bitmaps = getShellBitmaps();
         this.screenWidth = screenWidth;
         this.screenHeight = screenHeight;
@@ -90,6 +95,9 @@ public class Shell {
         }
     }
 
+    public void incrementScore() {
+        this.score += 1;
+    }
 
     // ------------------------------- Private methods -----------------------------------
 
@@ -102,7 +110,7 @@ public class Shell {
         if (otherTank.getColor() == Tank.Color.RED) { // This is the green tank
             paint.setColor(Color.GREEN);
             canvas.drawText(score, screenWidth - 220, screenHeight - 20, paint);
-        } else {
+        } else if (otherTank.getColor() == Tank.Color.GREEN) {
             paint.setColor(Color.RED);
             canvas.drawText(score, 16,66, paint);
         }
@@ -189,7 +197,12 @@ public class Shell {
 
         // Collides with other tank.
         if (otherTank.getRect().contains(rect.centerX(), rect.centerY())) {
-            this.score += 1;
+            if (otherTank.getColor() == Tank.Color.RED) { // This is the green tank
+                activity.sendReceiveThread.write(new byte[]{GREEN_SCORED});
+            } else if (otherTank.getColor() == Tank.Color.GREEN){
+                activity.sendReceiveThread.write(new byte[]{RED_SCORED});
+            }
+            incrementScore();
             return true;
         }
 

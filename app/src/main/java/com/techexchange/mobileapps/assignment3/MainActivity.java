@@ -3,6 +3,7 @@ package com.techexchange.mobileapps.assignment3;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.IntentFilter;
+import android.graphics.Color;
 import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
@@ -13,6 +14,7 @@ import android.os.StrictMode;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
@@ -58,7 +60,7 @@ public class MainActivity extends AppCompatActivity {
     BattlegroundView battlegroundView;
 
     // Actions
-    static final byte GREEN_TANK_UP = 0;
+    static final byte GREEN_TANK_UP = 14;
     static final byte GREEN_TANK_DOWN = 1;
     static final byte GREEN_TANK_LEFT = 2;
     static final byte GREEN_TANK_RIGHT = 3;
@@ -68,6 +70,10 @@ public class MainActivity extends AppCompatActivity {
     static final byte RED_TANK_LEFT = 7;
     static final byte RED_TANK_RIGHT = 8;
     static final byte RED_TANK_SHOOT = 9;
+    static final byte GREEN_SCORED = 10;
+    static final byte RED_SCORED = 11;
+    static final byte GREEN_TURN = 12;
+    static final byte RED_TURN = 13;
 
     enum Host {
         SERVER, CLIENT
@@ -175,8 +181,10 @@ public class MainActivity extends AppCompatActivity {
         switch (msg.what) {
             case MESSAGE_READ:
                 byte[] readBuffer = (byte[]) msg.obj;
-                byte action = readBuffer[0];
-                battlegroundView.handleAction(action);
+                for (int i = 0; i < readBuffer.length; i++) {
+                    byte action = readBuffer[i];
+                    battlegroundView.handleAction(action);
+                }
         }
         return true;
     });
@@ -245,6 +253,8 @@ public class MainActivity extends AppCompatActivity {
 
     WifiP2pManager.PeerListListener peerListListener = peerList -> {
         if (!peerList.getDeviceList().equals(peers)) {
+            playersList.setBackgroundColor(Color.WHITE);
+
             peers.clear();
             peers.addAll(peerList.getDeviceList());
 
@@ -265,6 +275,20 @@ public class MainActivity extends AppCompatActivity {
             progressBar.setVisibility(View.INVISIBLE);
             playersList.setAdapter(arrayAdapter);
 
+            // Dynamically set list view height
+            int totalHeight = 0;
+            int totalItems = Math.min(5, arrayAdapter.getCount());
+            for (int i = 0; i < totalItems; i++) {
+                View listItem = arrayAdapter.getView(i, null, playersList);
+                listItem.measure(0, 0);
+                totalHeight += listItem.getMeasuredHeight();
+            }
+            ViewGroup.LayoutParams params = playersList.getLayoutParams();
+            params.height = totalHeight + (playersList.getDividerHeight() * totalItems - 1);
+            playersList.setLayoutParams(params);
+            playersList.requestLayout();
+
+
             if (peers.size() == 0) {
                 Toast.makeText(getApplicationContext(),
                         "No Device Found!", Toast.LENGTH_SHORT).show();
@@ -281,14 +305,14 @@ public class MainActivity extends AppCompatActivity {
                 battlegroundView = new BattlegroundView(MainActivity.this);
                 setContentView(battlegroundView);
                 host = Host.SERVER;
-
+                Toast.makeText(getApplicationContext(), "You are the GREEN tank!", Toast.LENGTH_SHORT).show();
                 serverThread = new ServerThread();
                 serverThread.start();
             } else if (info.groupFormed) {
                 battlegroundView = new BattlegroundView(MainActivity.this);
                 setContentView(battlegroundView);
                 host = Host.CLIENT;
-
+                Toast.makeText(getApplicationContext(), "You are the RED tank!", Toast.LENGTH_SHORT).show();
                 clientThread = new ClientThread(groupOwnerAddress);
                 clientThread.start();
             }

@@ -7,17 +7,22 @@ import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.View;
+import android.widget.Toast;
 
+import static com.techexchange.mobileapps.assignment3.MainActivity.GREEN_SCORED;
 import static com.techexchange.mobileapps.assignment3.MainActivity.GREEN_TANK_DOWN;
 import static com.techexchange.mobileapps.assignment3.MainActivity.GREEN_TANK_LEFT;
 import static com.techexchange.mobileapps.assignment3.MainActivity.GREEN_TANK_RIGHT;
 import static com.techexchange.mobileapps.assignment3.MainActivity.GREEN_TANK_SHOOT;
 import static com.techexchange.mobileapps.assignment3.MainActivity.GREEN_TANK_UP;
+import static com.techexchange.mobileapps.assignment3.MainActivity.GREEN_TURN;
+import static com.techexchange.mobileapps.assignment3.MainActivity.RED_SCORED;
 import static com.techexchange.mobileapps.assignment3.MainActivity.RED_TANK_DOWN;
 import static com.techexchange.mobileapps.assignment3.MainActivity.RED_TANK_LEFT;
 import static com.techexchange.mobileapps.assignment3.MainActivity.RED_TANK_RIGHT;
 import static com.techexchange.mobileapps.assignment3.MainActivity.RED_TANK_SHOOT;
 import static com.techexchange.mobileapps.assignment3.MainActivity.RED_TANK_UP;
+import static com.techexchange.mobileapps.assignment3.MainActivity.RED_TURN;
 
 public class BattlegroundView extends View implements GestureDetector.OnGestureListener {
 
@@ -28,6 +33,9 @@ public class BattlegroundView extends View implements GestureDetector.OnGestureL
     private final Context context;
     private final MainActivity activity;
     private final GestureDetectorCompat detector;
+
+    private boolean greenTurn;
+    private boolean redTurn;
 
     Maze maze;
     Tank greenTank;     // TODO: Delete these
@@ -43,6 +51,21 @@ public class BattlegroundView extends View implements GestureDetector.OnGestureL
         this.maze = null;
         this.greenTank = null;
         this.redTank = null;
+
+        this.greenTurn = true;
+        this.redTurn = true;
+
+        Toast.makeText(context, "GREEN's turn", Toast.LENGTH_SHORT).show();
+    }
+
+    public void enableGreenTurn() {
+        this.greenTurn = true;
+        this.redTurn = false;
+    }
+
+    public void enableRedTurn() {
+        this.redTurn = true;
+        this.greenTurn = false;
     }
 
     @Override
@@ -100,11 +123,15 @@ public class BattlegroundView extends View implements GestureDetector.OnGestureL
 
     @Override
     public void onLongPress(MotionEvent e) {
-        if (activity.host == MainActivity.Host.SERVER) {
-            activity.sendReceiveThread.write(new byte[]{GREEN_TANK_SHOOT});
+        if (activity.host == MainActivity.Host.SERVER && this.greenTurn) {
+            this.enableRedTurn();
+            activity.sendReceiveThread.write(new byte[]{GREEN_TANK_SHOOT, RED_TURN});
+//            activity.sendReceiveThread.write(new byte[]{GREEN_TANK_SHOOT});
             greenTank.getShell().getExplosionRect(greenTank.getRect(), greenTank.getDirection());
-        } else if (activity.host == MainActivity.Host.CLIENT){
-            activity.sendReceiveThread.write(new byte[]{RED_TANK_SHOOT});
+        } else if (activity.host == MainActivity.Host.CLIENT && this.redTurn) {
+            this.enableGreenTurn();
+            activity.sendReceiveThread.write(new byte[]{RED_TANK_SHOOT, GREEN_TURN});
+//            activity.sendReceiveThread.write(new byte[]{RED_TANK_SHOOT});
             redTank.getShell().getExplosionRect(redTank.getRect(), redTank.getDirection());
         }
     }
@@ -113,87 +140,105 @@ public class BattlegroundView extends View implements GestureDetector.OnGestureL
     public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
         Log.d(TAG, "Green tank " + greenTank);
         Log.d(TAG, "Red tank " + redTank);
-//        if (greenTank != null && redTank != null && activity.sendReceiveThread != null) {
-            if (Math.abs(velocityX) >= Math.abs(velocityY)) {
-                if (velocityX < 0) {
-                    Log.d(TAG, "Left swipe");
-                    if (activity.host == MainActivity.Host.SERVER) {
-                        activity.sendReceiveThread.write(new byte[]{GREEN_TANK_LEFT});
-                        greenTank.handleLeft(maze.getBricks(), redTank);
-                    } else {
-                        activity.sendReceiveThread.write(new byte[]{RED_TANK_LEFT});
-                        redTank.handleLeft(maze.getBricks(), greenTank);
-                    }
-                } else {
-                    Log.d(TAG, "Right swipe");
-                    if (activity.host == MainActivity.Host.SERVER) {
-                        activity.sendReceiveThread.write(new byte[]{GREEN_TANK_RIGHT});
-                        greenTank.handleRight(maze.getBricks(), redTank);
-                    } else {
-                        activity.sendReceiveThread.write(new byte[]{RED_TANK_RIGHT});
-                        redTank.handleRight(maze.getBricks(), greenTank);
-                    }
-
+        if (Math.abs(velocityX) >= Math.abs(velocityY)) {
+            if (velocityX < 0) {
+                Log.d(TAG, "Left swipe");
+                if (activity.host == MainActivity.Host.SERVER && this.greenTurn) {
+                    this.enableRedTurn();
+                    activity.sendReceiveThread.write(new byte[]{GREEN_TANK_LEFT, RED_TURN});
+                    greenTank.handleLeft(maze.getBricks(), redTank);
+                } else if (activity.host == MainActivity.Host.CLIENT && this.redTurn) {
+                    this.enableGreenTurn();
+                    activity.sendReceiveThread.write(new byte[]{RED_TANK_LEFT, GREEN_TURN});
+                    redTank.handleLeft(maze.getBricks(), greenTank);
                 }
             } else {
-                if (velocityY < 0) {
-                    Log.d(TAG, "Up swipe");
-                    if (activity.host == MainActivity.Host.SERVER) {
-                        activity.sendReceiveThread.write(new byte[]{GREEN_TANK_UP});
-                        greenTank.handleUp(maze.getBricks(), redTank);
-                    } else {
-                        activity.sendReceiveThread.write(new byte[]{RED_TANK_UP});
-                        redTank.handleUp(maze.getBricks(), greenTank);
-                    }
-                } else {
-                    Log.d(TAG, "Down swipe");
-                    if (activity.host == MainActivity.Host.SERVER) {
-                        activity.sendReceiveThread.write(new byte[]{GREEN_TANK_DOWN});
-                        greenTank.handleDown(maze.getBricks(), redTank);
-                    } else {
-                        activity.sendReceiveThread.write(new byte[]{RED_TANK_DOWN});
-                        redTank.handleDown(maze.getBricks(), greenTank);
-                    }
+                Log.d(TAG, "Right swipe");
+                if (activity.host == MainActivity.Host.SERVER && this.greenTurn) {
+                    this.enableRedTurn();
+                    activity.sendReceiveThread.write(new byte[]{GREEN_TANK_RIGHT, RED_TURN});
+                    greenTank.handleRight(maze.getBricks(), redTank);
+                } else if (activity.host == MainActivity.Host.CLIENT && this.redTurn) {
+                    this.enableGreenTurn();
+                    activity.sendReceiveThread.write(new byte[]{RED_TANK_RIGHT, GREEN_TURN});
+                    redTank.handleRight(maze.getBricks(), greenTank);
+                }
+
+            }
+        } else {
+            if (velocityY < 0) {
+                Log.d(TAG, "Up swipe");
+                if (activity.host == MainActivity.Host.SERVER && this.greenTurn) {
+                    this.enableRedTurn();
+                    activity.sendReceiveThread.write(new byte[]{GREEN_TANK_UP, RED_TURN});
+                    greenTank.handleUp(maze.getBricks(), redTank);
+                } else if (activity.host == MainActivity.Host.CLIENT && this.redTurn) {
+                    this.enableGreenTurn();
+                    activity.sendReceiveThread.write(new byte[]{RED_TANK_UP, GREEN_TURN});
+                    redTank.handleUp(maze.getBricks(), greenTank);
+                }
+            } else {
+                Log.d(TAG, "Down swipe");
+                if (activity.host == MainActivity.Host.SERVER && this.greenTurn) {
+                    this.enableRedTurn();
+                    activity.sendReceiveThread.write(new byte[]{GREEN_TANK_DOWN, RED_TURN});
+                    greenTank.handleDown(maze.getBricks(), redTank);
+                } else if (activity.host == MainActivity.Host.CLIENT && this.redTurn) {
+                    this.enableGreenTurn();
+                    activity.sendReceiveThread.write(new byte[]{RED_TANK_DOWN, GREEN_TURN});
+                    redTank.handleDown(maze.getBricks(), greenTank);
                 }
             }
-//        }
+        }
         return true;
     }
 
     public void handleAction(byte action) {
-//        if (greenTank != null && redTank != null && maze != null) {
-            switch (action) {
-                case GREEN_TANK_UP:
-                    greenTank.handleUp(maze.getBricks(), redTank);
-                    break;
-                case GREEN_TANK_DOWN:
-                    greenTank.handleDown(maze.getBricks(), redTank);
-                    break;
-                case GREEN_TANK_LEFT:
-                    greenTank.handleLeft(maze.getBricks(), redTank);
-                    break;
-                case GREEN_TANK_RIGHT:
-                    greenTank.handleRight(maze.getBricks(), redTank);
-                    break;
-                case GREEN_TANK_SHOOT:
-                    greenTank.getShell().getExplosionRect(greenTank.getRect(), greenTank.getDirection());
-                    break;
-                case RED_TANK_UP:
-                    redTank.handleUp(maze.getBricks(), greenTank);
-                    break;
-                case RED_TANK_DOWN:
-                    redTank.handleDown(maze.getBricks(), greenTank);
-                    break;
-                case RED_TANK_LEFT:
-                    redTank.handleLeft(maze.getBricks(), greenTank);
-                    break;
-                case RED_TANK_RIGHT:
-                    redTank.handleRight(maze.getBricks(), greenTank);
-                    break;
-                case RED_TANK_SHOOT:
-                    redTank.getShell().getExplosionRect(redTank.getRect(), redTank.getDirection());
-                    break;
-            }
-//        }
+        switch (action) {
+            case GREEN_TANK_UP:
+                greenTank.handleUp(maze.getBricks(), redTank);
+                break;
+            case GREEN_TANK_DOWN:
+                greenTank.handleDown(maze.getBricks(), redTank);
+                break;
+            case GREEN_TANK_LEFT:
+                greenTank.handleLeft(maze.getBricks(), redTank);
+                break;
+            case GREEN_TANK_RIGHT:
+                greenTank.handleRight(maze.getBricks(), redTank);
+                break;
+            case GREEN_TANK_SHOOT:
+                greenTank.getShell().getExplosionRect(greenTank.getRect(), greenTank.getDirection());
+                break;
+            case RED_TANK_UP:
+                redTank.handleUp(maze.getBricks(), greenTank);
+                break;
+            case RED_TANK_DOWN:
+                redTank.handleDown(maze.getBricks(), greenTank);
+                break;
+            case RED_TANK_LEFT:
+                redTank.handleLeft(maze.getBricks(), greenTank);
+                break;
+            case RED_TANK_RIGHT:
+                redTank.handleRight(maze.getBricks(), greenTank);
+                break;
+            case RED_TANK_SHOOT:
+                redTank.getShell().getExplosionRect(redTank.getRect(), redTank.getDirection());
+                break;
+            case GREEN_SCORED:
+                greenTank.getShell().incrementScore();
+                break;
+            case RED_SCORED:
+                redTank.getShell().incrementScore();
+                break;
+            case GREEN_TURN:
+                this.enableGreenTurn();
+                Toast.makeText(getContext(), "GREEN's Turn", Toast.LENGTH_SHORT).show();
+                break;
+            case RED_TURN:
+                this.enableRedTurn();
+                Toast.makeText(getContext(), "RED's Turn", Toast.LENGTH_SHORT).show();
+                break;
+        }
     }
 }
